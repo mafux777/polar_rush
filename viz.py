@@ -221,53 +221,53 @@ for _, flight in high_arctic_flights.iterrows():
                 fontsize=6, color='red', ha='left', va='top', alpha=0.8)
 
 # Add title
-plt.suptitle('High Arctic Flight Paths (80°N+, May 17–18, 2025)', fontsize=18, y=0.95)
+plt.suptitle('High Arctic Flight Paths (80°N+, May 11–18, 2025) 1.4', fontsize=40, y=1.3)
 
 # Create custom legend for airlines with origin/destination info
 from matplotlib.lines import Line2D
 
 # Format origin/destination information
-legend_elements = []
-for airline, idx in sorted(airlines.items()):
-    # Find flights for this airline
-    airline_flights = []
-    for callsign, (origin_iata, origin_name, dest_iata, dest_name) in flight_origin_dest.items():
-        if callsign[:3] == airline:
-            # Highlight polar route airports in blue
-            if origin_iata and not pd.isna(origin_iata):
-                origin_display = f"\033[94m{origin_name}\033[0m" if origin_iata in polar_route_airports else origin_name
-            else:
-                origin_display = "Unknown"
-
-            if dest_iata and not pd.isna(dest_iata):
-                dest_display = f"\033[94m{dest_name}\033[0m" if dest_iata in polar_route_airports else dest_name
-            else:
-                dest_display = "Unknown"
-
-            airline_flights.append(f"{callsign}: {origin_display} → {dest_display}")
-
-    # Add to legend with flight info
-    flight_info = "\n".join(sorted(airline_flights)[:5])  # Sort and limit to first 5 flights if too many
-    if len(airline_flights) > 5:
-        flight_info += f"\n+ {len(airline_flights) - 5} more flights"
-
-    legend_elements.append(Line2D([0], [0], color=colors[idx], lw=2,
-                                  label=f"{airline} ({len(airline_flights)} flights)\n{flight_info}"))
-
-# Create a dedicated legend axis on the right side of the figure
-legend_ax = fig.add_axes([0.75, 0.05, 0.2, 0.9])
-legend_ax.axis('off')  # Turn off axis
-
-# Add the legend to this dedicated axis
-legend = legend_ax.legend(handles=legend_elements, loc='center left',
-                          title="Airlines (80°N+ Crossings)",
-                          frameon=True, framealpha=0.8,
-                          fontsize=9)
+# legend_elements = []
+# for airline, idx in sorted(airlines.items()):
+#     # Find flights for this airline
+#     airline_flights = []
+#     for callsign, (origin_iata, origin_name, dest_iata, dest_name) in flight_origin_dest.items():
+#         if callsign[:3] == airline:
+#             # Highlight polar route airports in blue
+#             if origin_iata and not pd.isna(origin_iata):
+#                 origin_display = f"\033[94m{origin_name}\033[0m" if origin_iata in polar_route_airports else origin_name
+#             else:
+#                 origin_display = "Unknown"
+#
+#             if dest_iata and not pd.isna(dest_iata):
+#                 dest_display = f"\033[94m{dest_name}\033[0m" if dest_iata in polar_route_airports else dest_name
+#             else:
+#                 dest_display = "Unknown"
+#
+#             airline_flights.append(f"{callsign}: {origin_display} → {dest_display}")
+#
+#     # Add to legend with flight info
+#     flight_info = "\n".join(sorted(airline_flights)[:5])  # Sort and limit to first 5 flights if too many
+#     if len(airline_flights) > 5:
+#         flight_info += f"\n+ {len(airline_flights) - 5} more flights"
+#
+#     legend_elements.append(Line2D([0], [0], color=colors[idx], lw=2,
+#                                   label=f"{airline} ({len(airline_flights)} flights)\n{flight_info}"))
+#
+# # Create a dedicated legend axis on the right side of the figure
+# legend_ax = fig.add_axes([0.75, 0.05, 0.2, 0.9])
+# legend_ax.axis('off')  # Turn off axis
+#
+# # Add the legend to this dedicated axis
+# legend = legend_ax.legend(handles=legend_elements, loc='center left',
+#                           title="Airlines (80°N+ Crossings)",
+#                           frameon=True, framealpha=0.8,
+#                           fontsize=9)
 
 # Set the title font size using the proper method
-title = legend.get_title()
-title.set_fontsize(12)
-title.set_weight('bold')
+# title = legend.get_title()
+# title.set_fontsize(12)
+# title.set_weight('bold')
 
 # Explanatory text at the bottom of the main plot
 ax.text(0.05, -0.05, 'Green dots: Entry points', fontsize=10, color='green', transform=ax.transAxes)
@@ -276,8 +276,6 @@ ax.text(0.65, -0.05, 'Only showing flights with 5+ data points above 80°N', fon
 
 # Major northern airports with coordinates and labels - using our default list for basic mapping
 default_airports = {
-    'Toronto (YYZ)': (43.6777, -79.6248),
-    'Vancouver (YVR)': (49.1951, -123.1800),
     'Oslo (OSL)': (60.1976, 11.1004),
     'Saint Petersburg (LED)': (59.8003, 30.2625),
     'Reykjavík (KEF)': (63.9850, -22.6056),
@@ -291,12 +289,6 @@ default_airports = {
     'Resolute Bay (YRB)': (74.7169, -94.9694),
     'Longyearbyen (LYR)': (78.2461, 15.4656),
     'Petropavlovsk-Kamchatsky (PKC)': (53.1709, 158.4536),
-    'New York (JFK)': (40.6413, -73.7781),
-    'Tokyo (HND)': (35.5494, 139.7798),
-    'Hong Kong (HKG)': (22.3080, 113.9185),
-    'Beijing (PEK)': (40.0799, 116.6031),
-    'Munich (MUC)': (48.3538, 11.7861),
-    'Doha (DOH)': (25.2736, 51.6081)
 }
 
 # Add airports from polar routes to our display
@@ -326,7 +318,7 @@ for name, (lat, lon) in all_airports.items():
         ax.plot(lon, lat, marker='^', color=airport_color, markersize=marker_size,
                 transform=ccrs.PlateCarree(), zorder=zorder)
         ax.text(lon, lat + 1, name, transform=ccrs.PlateCarree(),
-                fontsize=7, color=airport_color, ha='center', va='bottom')
+                fontsize=12, color=airport_color, ha='center', va='bottom')
     else:
         ax.plot(lon, min_lat, marker='^', color=airport_color, markersize=marker_size,
                 transform=ccrs.PlateCarree(), zorder=zorder)
@@ -340,12 +332,35 @@ for name, (lat, lon) in all_airports.items():
             ha = 'left'
 
         ax.text(lon, 60, f"{name}",
-                fontsize=9, color=airport_color,
+                fontsize=12, color=airport_color,
                 rotation=rotation,
                 rotation_mode='anchor',
                 ha=ha,
                 va='center',
                 transform=ccrs.PlateCarree(), )
+
+# Create airline legend elements first
+airline_legend_elements = []
+for airline, idx in sorted(airlines.items()):
+    # Count flights for this airline
+    flight_count = sum(1 for callsign in flight_origin_dest if callsign[:3] == airline)
+    # Add to legend with just the airline code and count
+    airline_legend_elements.append(
+        Line2D([0], [0], color=colors[idx], lw=4,
+              label=f"{airline} ({flight_count})")
+    )
+
+# Add airline legend at the bottom of the map
+airline_legend = ax.legend(handles=airline_legend_elements, 
+                          loc='lower center',
+                          title="Airlines (80°N+ Crossings)",
+                          frameon=True, 
+                          framealpha=0.8,
+                          fontsize=9,
+                          ncol=min(4, len(airlines))  # Display in columns for better space usage
+                          )
+plt.setp(airline_legend.get_title(), fontsize=10, fontweight='bold')
+ax.add_artist(airline_legend)  # Add the airline legend to the map
 
 # Add a legend entry for the airport colors
 airport_legend_elements = [
@@ -355,7 +370,7 @@ airport_legend_elements = [
            label='Other Airports')
 ]
 
-# Add small legend for airport markers
+# Add small legend for airport markers in the lower left
 airport_legend = ax.legend(handles=airport_legend_elements, loc='lower left',
                            frameon=True, framealpha=0.8, fontsize=9)
 ax.add_artist(airport_legend)  # Keep this legend on the map
