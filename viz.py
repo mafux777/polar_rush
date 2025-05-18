@@ -6,6 +6,7 @@ import matplotlib.path as mpath
 import numpy as np
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+from matplotlib.font_manager import FontProperties
 
 # SSL workaround for environments with certificate issues
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -93,9 +94,11 @@ def add_circular_boundary(ax):
     ax.set_boundary(circle, transform=ax.transAxes)
 
 
-# Set up figure and projection
-fig = plt.figure(figsize=(15, 15))
-ax = plt.axes(projection=ccrs.NorthPolarStereo(central_longitude=0))
+# Create a figure with extra space on the right for the legend
+fig = plt.figure(figsize=(20, 15))  # Wider figure to accommodate legend
+
+# Create the main map axes that doesn't use the entire figure width
+ax = fig.add_axes([0.05, 0.05, 0.65, 0.9], projection=ccrs.NorthPolarStereo(central_longitude=0))
 ax.set_extent([-180, 180, 70, 90], ccrs.PlateCarree())
 add_circular_boundary(ax)
 
@@ -187,7 +190,7 @@ from matplotlib.lines import Line2D
 
 # Format origin/destination information
 legend_elements = []
-for airline, idx in airlines.items():
+for airline, idx in sorted(airlines.items()):
     # Find flights for this airline
     airline_flights = []
     for callsign, (origin_name, dest_name) in flight_origin_dest.items():
@@ -195,21 +198,32 @@ for airline, idx in airlines.items():
             airline_flights.append(f"{callsign}: {origin_name} → {dest_name}")
 
     # Add to legend with flight info
-    flight_info = "\n".join(airline_flights[:5])  # Limit to first 5 flights if too many
+    flight_info = "\n".join(sorted(airline_flights)[:5])  # Sort and limit to first 5 flights if too many
     if len(airline_flights) > 5:
         flight_info += f"\n+ {len(airline_flights) - 5} more flights"
 
     legend_elements.append(Line2D([0], [0], color=colors[idx], lw=2,
                                   label=f"{airline} ({len(airline_flights)} flights)\n{flight_info}"))
 
-# Position the legend in the upper right
-ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.1, 1.05),
-          title="Airlines (80°N+ Crossings)", frameon=True, framealpha=0.8)
+# Create a dedicated legend axis on the right side of the figure
+legend_ax = fig.add_axes([0.75, 0.05, 0.2, 0.9])
+legend_ax.axis('off')  # Turn off axis
 
-# Explanatory text
-plt.figtext(0.15, 0.05, 'Green dots: Entry points', fontsize=10, color='green')
-plt.figtext(0.45, 0.05, 'Red dots: Exit points', fontsize=10, color='red')
-plt.figtext(0.75, 0.05, 'Only showing flights with 5+ data points above 80°N', fontsize=10)
+# Add the legend to this dedicated axis
+legend = legend_ax.legend(handles=legend_elements, loc='center left',
+                          title="Airlines (80°N+ Crossings)",
+                          frameon=True, framealpha=0.8,
+                          fontsize=9)
+
+# Set the title font size using the proper method
+title = legend.get_title()
+title.set_fontsize(12)
+title.set_weight('bold')
+
+# Explanatory text at the bottom of the main plot
+ax.text(0.05, -0.05, 'Green dots: Entry points', fontsize=10, color='green', transform=ax.transAxes)
+ax.text(0.35, -0.05, 'Red dots: Exit points', fontsize=10, color='red', transform=ax.transAxes)
+ax.text(0.65, -0.05, 'Only showing flights with 5+ data points above 80°N', fontsize=10, transform=ax.transAxes)
 
 # Major northern airports with coordinates and labels
 airports = {
@@ -266,6 +280,5 @@ for name, (lat, lon) in airports.items():
                 va='center',
                 transform=ccrs.PlateCarree(), )
 
-plt.tight_layout()
 plt.savefig('high_arctic_flights_map.png', dpi=300, bbox_inches='tight')
 plt.show()
