@@ -11,7 +11,10 @@ import cartopy.feature as cfeature
 ssl._create_default_https_context = ssl._create_unverified_context
 
 # Load the flight data
-flights_df = pd.read_csv('arctic_flights_summaries.csv')
+flights_df = pd.read_csv('arctic_flights_enhanced.csv')
+flights_df = flights_df.loc[flights_df.callsign.notna()]
+
+callsigns = set(flights_df.callsign.values)
 
 # Convert flight paths from string to list of (lat, lon) tuples
 def parse_path(path_str):
