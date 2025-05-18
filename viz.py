@@ -14,7 +14,44 @@ ssl._create_default_https_context = ssl._create_unverified_context
 flights_df = pd.read_csv('arctic_flights_enhanced.csv')
 flights_df = flights_df.loc[flights_df.callsign.notna()]
 
-callsigns = set(flights_df.callsign.values)
+# Load airport data
+airport_data = None
+if os.path.exists('world-airports.csv'):
+    try:
+        airport_data = pd.read_csv('world-airports.csv')
+        print(f"Loaded {len(airport_data)} airports from world-airports.csv")
+
+        # Create lookup dictionary for IATA codes
+        iata_lookup = {}
+        for _, row in airport_data.iterrows():
+            if pd.notna(row['iata_code']) and row['iata_code']:
+                iata_lookup[row['iata_code']] = row
+    except Exception as e:
+        print(f"Could not load world-airports.csv: {e}")
+else:
+    print("Warning: world-airports.csv not found. Airport information will not be available.")
+
+
+# Function to format airport name given an IATA code
+def format_airport_name(iata_code):
+    if not iata_code or pd.isna(iata_code) or airport_data is None:
+        return "Unknown"
+
+    # Try to find the airport by IATA code
+    if iata_code in iata_lookup:
+        airport = iata_lookup[iata_code]
+        municipality = airport['municipality'] if pd.notna(airport['municipality']) else ''
+
+        if municipality:
+            return f"{municipality} ({iata_code})"
+        else:
+            airport_name = airport['name'] if pd.notna(airport['name']) else ''
+            if airport_name:
+                return f"{airport_name} ({iata_code})"
+
+    # Return the code if we couldn't find/format a proper name
+    return iata_code
+
 
 # Convert flight paths from string to list of (lat, lon) tuples
 def parse_path(path_str):
@@ -29,7 +66,23 @@ def parse_path(path_str):
         coordinates.append((float(lat), float(lon)))
     return coordinates
 
+
 flights_df['parsed_path'] = flights_df['flight_path'].apply(parse_path)
+
+
+# Count data points above 80° latitude for each flight
+def count_points_above_80(path):
+    return sum(1 for lat, lon in path if lat > 80)
+
+
+flights_df['points_above_80'] = flights_df['parsed_path'].apply(count_points_above_80)
+
+# Filter flights to only show those with at least 5 data points above 80° latitude
+high_arctic_flights = flights_df[flights_df['points_above_80'] >= 5]
+
+print(f"Total flights: {len(flights_df)}")
+print(f"Flights with 5+ points above 80°N: {len(high_arctic_flights)}")
+
 
 # Add circular polar boundary
 def add_circular_boundary(ax):
@@ -38,6 +91,7 @@ def add_circular_boundary(ax):
     verts = np.vstack([np.sin(theta), np.cos(theta)]).T
     circle = mpath.Path(verts * radius + center)
     ax.set_boundary(circle, transform=ax.transAxes)
+
 
 # Set up figure and projection
 fig = plt.figure(figsize=(15, 15))
@@ -51,7 +105,6 @@ ax.add_feature(cfeature.BORDERS.with_scale('110m'), linestyle=':')
 ax.add_feature(cfeature.LAND.with_scale('110m'), facecolor='lightgray', alpha=0.5)
 ax.add_feature(cfeature.OCEAN.with_scale('110m'), facecolor='lightblue', alpha=0.5)
 
-
 # Add meridians (longitude lines) and parallels (latitude circles)
 gl = ax.gridlines(crs=ccrs.PlateCarree(),
                   draw_labels=False,
@@ -61,12 +114,11 @@ gl = ax.gridlines(crs=ccrs.PlateCarree(),
                   linestyle='--')
 
 # Specify which lines you want: meridians and/or parallels
-gl.xlocator = plt.MultipleLocator(30)   # meridians every 30°
+gl.xlocator = plt.MultipleLocator(30)  # meridians every 30°
 gl.ylocator = plt.FixedLocator([70, 75, 80, 85])  # parallels
 
-
 # Add latitude markers
-for lat in [65,70, 75, 80, 85]:
+for lat in [65, 70, 75, 80, 85]:
     ax.text(180, lat, f'{lat}°N', transform=ccrs.PlateCarree(),
             ha='center', va='center')
     circle = plt.Circle((0, 0), radius=90 - lat,
@@ -76,18 +128,35 @@ for lat in [65,70, 75, 80, 85]:
 
 # Airline color mapping
 airlines = {}
-for _, flight in flights_df.iterrows():
+flight_origin_dest = {}  # Store origin and destination for each flight
+
+# Process each flight to get origin/destination airports
+for _, flight in high_arctic_flights.iterrows():
     callsign = flight['callsign']
-    if callsign and len(callsign) >= 3:
-        airline_code = callsign[:3]
-        if airline_code not in airlines:
-            airlines[airline_code] = len(airlines)
+    path = flight['parsed_path']
+
+    if len(path) > 3:
+        if callsign and len(callsign) >= 3:
+            airline_code = callsign[:3]
+            if airline_code not in airlines:
+                airlines[airline_code] = len(airlines)
+
+            # Get origin and destination IATA codes
+            origin_iata = flight.get('ori_iata', None)
+            dest_iata = flight.get('dest_iata', None)
+
+            # Format the airport names
+            origin_name = format_airport_name(origin_iata)
+            dest_name = format_airport_name(dest_iata)
+
+            # Store the origin and destination info
+            flight_origin_dest[callsign] = (origin_name, dest_name)
 
 cmap = plt.cm.tab20
 colors = [cmap(i % 20) for i in range(len(airlines))]
 
 # Plot flights
-for _, flight in flights_df.iterrows():
+for _, flight in high_arctic_flights.iterrows():
     path = flight['parsed_path']
     if len(path) > 3:
         lats, lons = zip(*path)
@@ -111,20 +180,36 @@ for _, flight in flights_df.iterrows():
                 fontsize=6, color='red', ha='left', va='top', alpha=0.8)
 
 # Add title
-plt.suptitle('Arctic Flight Paths (May 17–18, 2025)', fontsize=18, y=0.95)
+plt.suptitle('High Arctic Flight Paths (80°N+, May 17–18, 2025)', fontsize=18, y=0.95)
 
-# Airline legend
+# Create custom legend for airlines with origin/destination info
 from matplotlib.lines import Line2D
-# Airline legend moved to top right
-legend_elements = [Line2D([0], [0], color=colors[idx], lw=2, label=airline)
-                   for airline, idx in airlines.items()]
+
+# Format origin/destination information
+legend_elements = []
+for airline, idx in airlines.items():
+    # Find flights for this airline
+    airline_flights = []
+    for callsign, (origin_name, dest_name) in flight_origin_dest.items():
+        if callsign[:3] == airline:
+            airline_flights.append(f"{callsign}: {origin_name} → {dest_name}")
+
+    # Add to legend with flight info
+    flight_info = "\n".join(airline_flights[:5])  # Limit to first 5 flights if too many
+    if len(airline_flights) > 5:
+        flight_info += f"\n+ {len(airline_flights) - 5} more flights"
+
+    legend_elements.append(Line2D([0], [0], color=colors[idx], lw=2,
+                                  label=f"{airline} ({len(airline_flights)} flights)\n{flight_info}"))
+
+# Position the legend in the upper right
 ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.1, 1.05),
-          title="Airlines", frameon=True, framealpha=0.8)
+          title="Airlines (80°N+ Crossings)", frameon=True, framealpha=0.8)
 
 # Explanatory text
 plt.figtext(0.15, 0.05, 'Green dots: Entry points', fontsize=10, color='green')
 plt.figtext(0.45, 0.05, 'Red dots: Exit points', fontsize=10, color='red')
-
+plt.figtext(0.75, 0.05, 'Only showing flights with 5+ data points above 80°N', fontsize=10)
 
 # Major northern airports with coordinates and labels
 airports = {
@@ -150,8 +235,8 @@ airports = {
     'Munich (MUC)': (48.3538, 11.7861),
     'Doha (DOH)': (25.2736, 51.6081)
 }
-from matplotlib.transforms import Affine2D
 
+# Display relevant airports
 min_lat = 60  # Map cutoff
 
 for name, (lat, lon) in airports.items():
@@ -167,10 +252,10 @@ for name, (lat, lon) in airports.items():
 
         # Determine flip and alignment
         if -180 < lon < 0:
-            rotation = lon +90
+            rotation = lon + 90
             ha = 'right'
         else:
-            rotation = lon -90
+            rotation = lon - 90
             ha = 'left'
 
         ax.text(lon, 60, f"{name}",
@@ -179,8 +264,8 @@ for name, (lat, lon) in airports.items():
                 rotation_mode='anchor',
                 ha=ha,
                 va='center',
-                transform=ccrs.PlateCarree(),)
+                transform=ccrs.PlateCarree(), )
 
 plt.tight_layout()
-plt.savefig('arctic_flights_map_with_callsigns.png', dpi=300, bbox_inches='tight')
+plt.savefig('high_arctic_flights_map.png', dpi=300, bbox_inches='tight')
 plt.show()
