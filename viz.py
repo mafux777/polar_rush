@@ -132,8 +132,8 @@ def add_circular_boundary(ax):
     ax.set_boundary(circle, transform=ax.transAxes)
 
 
-# Create a figure with extra space on the right for the legend
-fig = plt.figure(figsize=(20, 15))  # Wider figure to accommodate legend
+# Create a figure with a more reasonable size that fits LinkedIn's limits
+fig = plt.figure(figsize=(16, 12))  # Reduced size to stay under the 6000x6000 pixel limit
 
 # Create the main map axes that doesn't use the entire figure width
 ax = fig.add_axes([0.05, 0.05, 0.65, 0.9], projection=ccrs.NorthPolarStereo(central_longitude=0))
@@ -375,5 +375,12 @@ airport_legend = ax.legend(handles=airport_legend_elements, loc='lower left',
                            frameon=True, framealpha=0.8, fontsize=9)
 ax.add_artist(airport_legend)  # Keep this legend on the map
 
-plt.savefig('high_arctic_flights_map.png', dpi=300, bbox_inches='tight')
+# Define a reasonable DPI to keep the image within 6000x6000 pixel limit
+figure_size_inches = fig.get_size_inches()
+max_dimension_inches = max(figure_size_inches)
+max_dpi = int(6000 / max_dimension_inches)
+output_dpi = min(300, max_dpi)  # Use 300 dpi or lower if needed to stay under limit
+
+print(f"Saving image with dimensions: {figure_size_inches[0]*output_dpi} x {figure_size_inches[1]*output_dpi} pixels at {output_dpi} dpi")
+plt.savefig('high_arctic_flights_map.png', dpi=output_dpi, bbox_inches='tight')
 plt.show()

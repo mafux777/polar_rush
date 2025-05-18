@@ -1,0 +1,34 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+.env
+.venv
+venv/
+ENV/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Data files
+*.csv
+*.kml
+
+# macOS files
+.DS_Store
+
+# Generated output files
+*.png
+!arctic_flights_map.png
+!high_arctic_flights_map.png
+
+# Downloaded geographic data
+ne_*m_land/
+ne_*m_land.zip
