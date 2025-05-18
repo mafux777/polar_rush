@@ -31,13 +31,13 @@ flights_df['parsed_path'] = flights_df['flight_path'].apply(parse_path)
 # Add circular polar boundary
 def add_circular_boundary(ax):
     theta = np.linspace(0, 2 * np.pi, 100)
-    center, radius = [0.5, 0.5], 0.5
+    center, radius = [0.5, 0.5], 0.75
     verts = np.vstack([np.sin(theta), np.cos(theta)]).T
     circle = mpath.Path(verts * radius + center)
     ax.set_boundary(circle, transform=ax.transAxes)
 
 # Set up figure and projection
-fig = plt.figure(figsize=(12, 12))
+fig = plt.figure(figsize=(15, 15))
 ax = plt.axes(projection=ccrs.NorthPolarStereo(central_longitude=0))
 ax.set_extent([-180, 180, 70, 90], ccrs.PlateCarree())
 add_circular_boundary(ax)
@@ -48,8 +48,22 @@ ax.add_feature(cfeature.BORDERS.with_scale('110m'), linestyle=':')
 ax.add_feature(cfeature.LAND.with_scale('110m'), facecolor='lightgray', alpha=0.5)
 ax.add_feature(cfeature.OCEAN.with_scale('110m'), facecolor='lightblue', alpha=0.5)
 
+
+# Add meridians (longitude lines) and parallels (latitude circles)
+gl = ax.gridlines(crs=ccrs.PlateCarree(),
+                  draw_labels=False,
+                  linewidth=1,
+                  color='gray',
+                  alpha=0.5,
+                  linestyle='--')
+
+# Specify which lines you want: meridians and/or parallels
+gl.xlocator = plt.MultipleLocator(30)   # meridians every 30°
+gl.ylocator = plt.FixedLocator([70, 75, 80, 85])  # parallels
+
+
 # Add latitude markers
-for lat in [75, 80, 85]:
+for lat in [65,70, 75, 80, 85]:
     ax.text(180, lat, f'{lat}°N', transform=ccrs.PlateCarree(),
             ha='center', va='center')
     circle = plt.Circle((0, 0), radius=90 - lat,
@@ -94,18 +108,42 @@ for _, flight in flights_df.iterrows():
                 fontsize=6, color='red', ha='left', va='top', alpha=0.8)
 
 # Add title
-plt.title('Arctic Flight Paths (May 17–18, 2025)', fontsize=16)
+plt.suptitle('Arctic Flight Paths (May 17–18, 2025)', fontsize=18, y=0.95)
 
 # Airline legend
 from matplotlib.lines import Line2D
+# Airline legend moved to top right
 legend_elements = [Line2D([0], [0], color=colors[idx], lw=2, label=airline)
                    for airline, idx in airlines.items()]
-ax.legend(handles=legend_elements, loc='lower left', bbox_to_anchor=(0.1, 0.1),
+ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.1, 1.05),
           title="Airlines", frameon=True, framealpha=0.8)
 
 # Explanatory text
 plt.figtext(0.15, 0.05, 'Green dots: Entry points', fontsize=10, color='green')
 plt.figtext(0.45, 0.05, 'Red dots: Exit points', fontsize=10, color='red')
+
+
+# Major northern airports with coordinates and labels
+airports = {
+    'Oslo (OSL)': (60.1976, 11.1004),
+    'Saint Petersburg (LED)': (59.8003, 30.2625),
+    'Reykjavík (KEF)': (63.9850, -22.6056),
+    'Anchorage (ANC)': (61.1743, -149.9983),
+    'Murmansk (MMK)': (68.7817, 32.7508),
+    'Tromsø (TOS)': (69.6833, 18.9189),
+    'Magadan (GDX)': (59.9100, 150.7200),
+    'Yellowknife (YZF)': (62.4628, -114.4403),
+    'Inuvik (YEV)': (68.3042, -133.4833),
+    'Iqaluit (YFB)': (63.7564, -68.5558),
+    'Resolute Bay (YRB)': (74.7169, -94.9694),
+    'Longyearbyen (LYR)': (78.2461, 15.4656)
+}
+
+for name, (lat, lon) in airports.items():
+    ax.plot(lon, lat, marker='^', color='blue', markersize=6,
+            transform=ccrs.PlateCarree(), zorder=5)
+    ax.text(lon, lat + 1, name, transform=ccrs.PlateCarree(),
+            fontsize=7, color='blue', ha='center', va='bottom')
 
 plt.tight_layout()
 plt.savefig('arctic_flights_map_with_callsigns.png', dpi=300, bbox_inches='tight')

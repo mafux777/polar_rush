@@ -27,7 +27,7 @@ headers = {
 
 # Define the bounding box for the Arctic region (north of ~80 degrees latitude)
 # Order: north, south, west, east
-arctic_bounds = "90.0,80.0,-180.0,180.0"
+arctic_bounds = "90.0,75.0,-180.0,180.0"
 
 # Throttling parameters
 MAX_RETRIES = 5
@@ -91,7 +91,7 @@ def make_api_request(url, params, headers, max_retries=MAX_RETRIES):
 
 # Calculate the time range (now to 24 hours ago)
 end_time = datetime.now()
-start_time = end_time - timedelta(hours=24)
+start_time = end_time - timedelta(hours=24*7)
 
 # Initialize a dictionary to store flight paths
 # Key: fr24_id, Value: list of position dictionaries
