@@ -54,6 +54,22 @@ def format_airport_name(iata_code):
     return iata_code
 
 
+# Function to get airport coordinates from IATA code
+def get_airport_coordinates(iata_code):
+    if not iata_code or pd.isna(iata_code) or airport_data is None:
+        return None
+
+    if iata_code in iata_lookup:
+        airport = iata_lookup[iata_code]
+        lat = airport['latitude_deg'] if pd.notna(airport['latitude_deg']) else None
+        lon = airport['longitude_deg'] if pd.notna(airport['longitude_deg']) else None
+
+        if lat is not None and lon is not None:
+            return (float(lat), float(lon))
+
+    return None
+
+
 # Convert flight paths from string to list of (lat, lon) tuples
 def parse_path(path_str):
     path_str = path_str.strip('[]')
@@ -83,6 +99,28 @@ high_arctic_flights = flights_df[flights_df['points_above_80'] >= 5]
 
 print(f"Total flights: {len(flights_df)}")
 print(f"Flights with 5+ points above 80°N: {len(high_arctic_flights)}")
+
+# Collect all unique origin and destination airports
+origin_airports = set()
+destination_airports = set()
+polar_route_airports = set()  # All airports used in polar routes
+
+# Process each flight to identify airports in polar routes
+for _, flight in high_arctic_flights.iterrows():
+    origin_iata = flight.get('ori_iata', None)
+    dest_iata = flight.get('dest_iata', None)
+
+    if origin_iata and not pd.isna(origin_iata):
+        origin_airports.add(origin_iata)
+        polar_route_airports.add(origin_iata)
+
+    if dest_iata and not pd.isna(dest_iata):
+        destination_airports.add(dest_iata)
+        polar_route_airports.add(dest_iata)
+
+print(f"Unique origin airports: {len(origin_airports)}")
+print(f"Unique destination airports: {len(destination_airports)}")
+print(f"Total unique airports in polar routes: {len(polar_route_airports)}")
 
 
 # Add circular polar boundary
@@ -153,7 +191,7 @@ for _, flight in high_arctic_flights.iterrows():
             dest_name = format_airport_name(dest_iata)
 
             # Store the origin and destination info
-            flight_origin_dest[callsign] = (origin_name, dest_name)
+            flight_origin_dest[callsign] = (origin_iata, origin_name, dest_iata, dest_name)
 
 cmap = plt.cm.tab20
 colors = [cmap(i % 20) for i in range(len(airlines))]
@@ -193,9 +231,20 @@ legend_elements = []
 for airline, idx in sorted(airlines.items()):
     # Find flights for this airline
     airline_flights = []
-    for callsign, (origin_name, dest_name) in flight_origin_dest.items():
+    for callsign, (origin_iata, origin_name, dest_iata, dest_name) in flight_origin_dest.items():
         if callsign[:3] == airline:
-            airline_flights.append(f"{callsign}: {origin_name} → {dest_name}")
+            # Highlight polar route airports in blue
+            if origin_iata and not pd.isna(origin_iata):
+                origin_display = f"\033[94m{origin_name}\033[0m" if origin_iata in polar_route_airports else origin_name
+            else:
+                origin_display = "Unknown"
+
+            if dest_iata and not pd.isna(dest_iata):
+                dest_display = f"\033[94m{dest_name}\033[0m" if dest_iata in polar_route_airports else dest_name
+            else:
+                dest_display = "Unknown"
+
+            airline_flights.append(f"{callsign}: {origin_display} → {dest_display}")
 
     # Add to legend with flight info
     flight_info = "\n".join(sorted(airline_flights)[:5])  # Sort and limit to first 5 flights if too many
@@ -225,8 +274,8 @@ ax.text(0.05, -0.05, 'Green dots: Entry points', fontsize=10, color='green', tra
 ax.text(0.35, -0.05, 'Red dots: Exit points', fontsize=10, color='red', transform=ax.transAxes)
 ax.text(0.65, -0.05, 'Only showing flights with 5+ data points above 80°N', fontsize=10, transform=ax.transAxes)
 
-# Major northern airports with coordinates and labels
-airports = {
+# Major northern airports with coordinates and labels - using our default list for basic mapping
+default_airports = {
     'Toronto (YYZ)': (43.6777, -79.6248),
     'Vancouver (YVR)': (49.1951, -123.1800),
     'Oslo (OSL)': (60.1976, 11.1004),
@@ -250,19 +299,37 @@ airports = {
     'Doha (DOH)': (25.2736, 51.6081)
 }
 
-# Display relevant airports
+# Add airports from polar routes to our display
+polar_route_airport_info = {}
+for iata in polar_route_airports:
+    coords = get_airport_coordinates(iata)
+    if coords:
+        name = format_airport_name(iata)
+        polar_route_airport_info[name] = coords
+
+# Combine default airports with polar route airports
+all_airports = {}
+all_airports.update(default_airports)
+all_airports.update(polar_route_airport_info)
+
+# Display all airports
 min_lat = 60  # Map cutoff
 
-for name, (lat, lon) in airports.items():
+for name, (lat, lon) in all_airports.items():
+    is_polar_route = any(iata in name for iata in polar_route_airports)
+    airport_color = 'blue' if is_polar_route else 'gray'
+    marker_size = 8 if is_polar_route else 6
+    zorder = 10 if is_polar_route else 5
+
     if lat >= min_lat:
         # Plot normally
-        ax.plot(lon, lat, marker='^', color='blue', markersize=6,
-                transform=ccrs.PlateCarree(), zorder=5)
+        ax.plot(lon, lat, marker='^', color=airport_color, markersize=marker_size,
+                transform=ccrs.PlateCarree(), zorder=zorder)
         ax.text(lon, lat + 1, name, transform=ccrs.PlateCarree(),
-                fontsize=7, color='blue', ha='center', va='bottom')
+                fontsize=7, color=airport_color, ha='center', va='bottom')
     else:
-        ax.plot(lon, min_lat, marker='^', color='blue', markersize=6,
-                transform=ccrs.PlateCarree(), zorder=5)
+        ax.plot(lon, min_lat, marker='^', color=airport_color, markersize=marker_size,
+                transform=ccrs.PlateCarree(), zorder=zorder)
 
         # Determine flip and alignment
         if -180 < lon < 0:
@@ -273,12 +340,25 @@ for name, (lat, lon) in airports.items():
             ha = 'left'
 
         ax.text(lon, 60, f"{name}",
-                fontsize=10, color='red',
+                fontsize=9, color=airport_color,
                 rotation=rotation,
                 rotation_mode='anchor',
                 ha=ha,
                 va='center',
                 transform=ccrs.PlateCarree(), )
+
+# Add a legend entry for the airport colors
+airport_legend_elements = [
+    Line2D([0], [0], marker='^', color='w', markerfacecolor='blue', markersize=10,
+           label='Polar Route Airports'),
+    Line2D([0], [0], marker='^', color='w', markerfacecolor='gray', markersize=10,
+           label='Other Airports')
+]
+
+# Add small legend for airport markers
+airport_legend = ax.legend(handles=airport_legend_elements, loc='lower left',
+                           frameon=True, framealpha=0.8, fontsize=9)
+ax.add_artist(airport_legend)  # Keep this legend on the map
 
 plt.savefig('high_arctic_flights_map.png', dpi=300, bbox_inches='tight')
 plt.show()
