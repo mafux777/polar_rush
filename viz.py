@@ -125,6 +125,8 @@ plt.figtext(0.45, 0.05, 'Red dots: Exit points', fontsize=10, color='red')
 
 # Major northern airports with coordinates and labels
 airports = {
+    'Toronto (YYZ)': (43.6777, -79.6248),
+    'Vancouver (YVR)': (49.1951, -123.1800),
     'Oslo (OSL)': (60.1976, 11.1004),
     'Saint Petersburg (LED)': (59.8003, 30.2625),
     'Reykjavík (KEF)': (63.9850, -22.6056),
@@ -136,14 +138,45 @@ airports = {
     'Inuvik (YEV)': (68.3042, -133.4833),
     'Iqaluit (YFB)': (63.7564, -68.5558),
     'Resolute Bay (YRB)': (74.7169, -94.9694),
-    'Longyearbyen (LYR)': (78.2461, 15.4656)
+    'Longyearbyen (LYR)': (78.2461, 15.4656),
+    'Petropavlovsk-Kamchatsky (PKC)': (53.1709, 158.4536),
+    'New York (JFK)': (40.6413, -73.7781),
+    'Tokyo (HND)': (35.5494, 139.7798),
+    'Hong Kong (HKG)': (22.3080, 113.9185),
+    'Beijing (PEK)': (40.0799, 116.6031),
+    'Munich (MUC)': (48.3538, 11.7861),
+    'Doha (DOH)': (25.2736, 51.6081)
 }
+from matplotlib.transforms import Affine2D
+
+min_lat = 60  # Map cutoff
 
 for name, (lat, lon) in airports.items():
-    ax.plot(lon, lat, marker='^', color='blue', markersize=6,
-            transform=ccrs.PlateCarree(), zorder=5)
-    ax.text(lon, lat + 1, name, transform=ccrs.PlateCarree(),
-            fontsize=7, color='blue', ha='center', va='bottom')
+    if lat >= min_lat:
+        # Plot normally
+        ax.plot(lon, lat, marker='^', color='blue', markersize=6,
+                transform=ccrs.PlateCarree(), zorder=5)
+        ax.text(lon, lat + 1, name, transform=ccrs.PlateCarree(),
+                fontsize=7, color='blue', ha='center', va='bottom')
+    else:
+        ax.plot(lon, min_lat, marker='^', color='blue', markersize=6,
+                transform=ccrs.PlateCarree(), zorder=5)
+
+        # Determine flip and alignment
+        if -180 < lon < 0:
+            rotation = lon +90
+            ha = 'right'
+        else:
+            rotation = lon -90
+            ha = 'left'
+
+        ax.text(lon, 60, f"{name}",
+                fontsize=10, color='red',
+                rotation=rotation,
+                rotation_mode='anchor',
+                ha=ha,
+                va='center',
+                transform=ccrs.PlateCarree(),)
 
 plt.tight_layout()
 plt.savefig('arctic_flights_map_with_callsigns.png', dpi=300, bbox_inches='tight')
